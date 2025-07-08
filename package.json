@@ -1,6 +1,6 @@
 {
-  "name": "v-mask",
-  "version": "3.0.8",
+  "name": "vue3-mask",
+  "version": "3.0.9",
   "description": "Tiny input mask library for Vue.js based on text-mask-core (~5kb) exposed as directive. No dependencies",
   "main": "dist/vue3-mask.js",
   "module": "dist/vue3-mask.esm.js",
