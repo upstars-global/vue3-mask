@@ -10,6 +10,7 @@ export const defaultMaskReplacers = {
   '#': /\d/,
   A: /[a-z]/i,
   N: /[a-z0-9]/i,
+  s: /\s+/,
   '?': NEXT_CHAR_OPTIONAL,
   X: /./
 }

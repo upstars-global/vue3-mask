@@ -29,6 +29,3 @@ export const isString = (val: unknown) => typeof val === 'string'
  * Determines whether the passed value is a string
  */
 export const isRegexp = (val: unknown) => val instanceof RegExp
-
-export { extendMaskReplacers } from './extendMaskReplacers'
-export { parseMask } from './parseMask'
