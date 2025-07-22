@@ -1,5 +1,5 @@
 import type { MaskReplacers } from '../types'
-import { defaultMaskReplacers, NEXT_CHAR_OPTIONAL } from '../constants'
+import { defaultMaskReplacers, defaultMaskReplacersGlobal, NEXT_CHAR_OPTIONAL } from '../constants'
 import { castToRegexp, makeRegexpOptional } from './regexp'
 
 const maskToRegExpMask = (mask: Array<string | RegExp> | null, maskReplacers: MaskReplacers = defaultMaskReplacers) => {
@@ -42,14 +42,14 @@ export const arrayMaskDynamicTransformToString = (
   inputValue: string
 ) => {
   const modifyValueToMask = inputValue
-    .replace(maskReplacers['#'] as RegExp, '#')
-    .replace(maskReplacers['A'] as RegExp, 'A')
-    .replace(maskReplacers['s'] as RegExp, '')
+    .replace(defaultMaskReplacersGlobal['#'] as RegExp, '#')
+    .replace(defaultMaskReplacersGlobal['A'] as RegExp, 'A')
+    .replace(defaultMaskReplacersGlobal['s'] as RegExp, '')
     .split('')
 
   if (modifyValueToMask.length) {
     arrayMask.some(function (currentMask) {
-      const modifyCurrentMask = String(currentMask).replace(maskReplacers['s'] as RegExp, '')
+      const modifyCurrentMask = String(currentMask).replace(defaultMaskReplacersGlobal['s'] as RegExp, '')
 
       const matchMaskFound = modifyValueToMask.every(function (val, index) {
         if (modifyCurrentMask[index] === val) {
