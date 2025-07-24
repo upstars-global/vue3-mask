@@ -1,10 +1,14 @@
 import type { InputMask, MaskReplacers } from '../types'
-import { arrayMaskToRegExpMask, stringMaskToRegExpMask } from './maskToRegExpMask'
+import { arrayMaskDynamicTransformToString, stringMaskToRegExpMask } from './maskToRegExpMask'
 import { isFunction, isString } from './index'
 
-export const parseMask = (inputMask: InputMask, maskReplacers: MaskReplacers): RegExp[] | unknown => {
-  if (Array.isArray(inputMask)) {
-    return arrayMaskToRegExpMask(inputMask, maskReplacers)
+export const parseMask = (
+  inputMask: InputMask,
+  maskReplacers: MaskReplacers,
+  inputValue: string
+): RegExp[] | unknown => {
+  if (Array.isArray(inputMask) && inputMask.length) {
+    return arrayMaskDynamicTransformToString(inputMask, maskReplacers, inputValue)
   }
 
   if (isFunction(inputMask)) {

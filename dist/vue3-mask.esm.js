@@ -154,16 +154,28 @@ function conformToMask(rawValue = emptyString, mask = emptyArray, config = {}) {
   };
 }
 
-var __assign = function () {
-  __assign = Object.assign || function __assign(t) {
-    for (var s, i = 1, n = arguments.length; i < n; i++) {
-      s = arguments[i];
-      for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
-    }
-    return t;
-  };
-  return __assign.apply(this, arguments);
+/**
+ * Notifies Vue about internal value change
+ * @see https://github.com/vuejs/Discussion/issues/157#issuecomment-273301588
+ */
+var trigger = function (el, type) {
+    var event = new CustomEvent(type, { bubbles: true, cancelable: true });
+    el.dispatchEvent(event);
 };
+/**
+ * Extracts first input element inside given html element (if any)
+ */
+var queryInputElementInside = function (el) {
+    return el instanceof HTMLInputElement ? el : el.querySelector('input') || el;
+};
+/**
+ * Determines whether the passed value is a function
+ */
+var isFunction = function (val) { return typeof val === 'function'; };
+/**
+ * Determines whether the passed value is a string
+ */
+var isString = function (val) { return typeof val === 'string'; };
 
 /**
  * A special object to identify next character as optional
@@ -176,24 +188,14 @@ var defaultMaskReplacers = {
     '#': /\d/,
     A: /[a-z]/i,
     N: /[a-z0-9]/i,
+    s: /\s+/,
     '?': NEXT_CHAR_OPTIONAL,
     X: /./
 };
-
-var extendMaskReplacers = function (maskReplacers, baseMaskReplacers) {
-    if (baseMaskReplacers === void 0) { baseMaskReplacers = defaultMaskReplacers; }
-    if (maskReplacers === null || Array.isArray(maskReplacers) || typeof maskReplacers !== 'object') {
-        return baseMaskReplacers;
-    }
-    return Object.keys(maskReplacers).reduce(function (extendedMaskReplacers, key) {
-        var _a;
-        var value = maskReplacers[key];
-        if (value !== null && !(value instanceof RegExp)) {
-            return extendedMaskReplacers;
-        }
-        return __assign(__assign({}, extendedMaskReplacers), (_a = {}, _a[key] = value, _a));
-    }, baseMaskReplacers);
-};
+var defaultMaskReplacersGlobal = {
+    '#': /\d/g,
+    A: /[a-z]/gi,
+    s: /\s+/g};
 
 /**
  * @example
@@ -248,28 +250,44 @@ var stringMaskToRegExpMask = function (stringMask, maskReplacers) {
     return maskToRegExpMask(stringMask.split(''), maskReplacers);
 };
 /**
- * Converts mask from `v-mask` array format to `text-mask-core` format
+ * Converts mask from `v-mask` array format to string format
  */
-var arrayMaskToRegExpMask = function (arrayMask, maskReplacers) {
+var dynamicMask = '';
+var arrayMaskDynamicTransformToString = function (arrayMask, maskReplacers, inputValue) {
     if (maskReplacers === void 0) { maskReplacers = defaultMaskReplacers; }
-    var flattenedMask = arrayMask
-        .map(function (part) {
-        if (part instanceof RegExp) {
-            return part;
-        }
-        if (typeof part === 'string') {
-            return part.split('');
-        }
-        return null;
-    })
-        .filter(Boolean)
-        .reduce(function (mask, part) { return mask.concat(part); }, []);
-    return maskToRegExpMask(flattenedMask, maskReplacers);
+    var modifyValueToMask = inputValue
+        .replace(defaultMaskReplacersGlobal['#'], '#')
+        .replace(defaultMaskReplacersGlobal['A'], 'A')
+        .replace(defaultMaskReplacersGlobal['s'], '')
+        .split('');
+    if (modifyValueToMask.length) {
+        arrayMask.some(function (currentMask) {
+            var modifyCurrentMask = String(currentMask).replace(defaultMaskReplacersGlobal['s'], '');
+            var matchMaskFound = modifyValueToMask.every(function (val, index) {
+                if (modifyCurrentMask[index] === val) {
+                    return true;
+                }
+                else if ((val === '#' || val === 'A') && modifyCurrentMask[index] === 'N') {
+                    return true;
+                }
+                return false;
+            });
+            if (matchMaskFound) {
+                dynamicMask = currentMask;
+                return true;
+            }
+            return false;
+        });
+    }
+    else {
+        dynamicMask = arrayMask[0];
+    }
+    return stringMaskToRegExpMask(dynamicMask, maskReplacers);
 };
 
-var parseMask = function (inputMask, maskReplacers) {
-    if (Array.isArray(inputMask)) {
-        return arrayMaskToRegExpMask(inputMask, maskReplacers);
+var parseMask = function (inputMask, maskReplacers, inputValue) {
+    if (Array.isArray(inputMask) && inputMask.length) {
+        return arrayMaskDynamicTransformToString(inputMask, maskReplacers, inputValue);
     }
     if (isFunction(inputMask)) {
         return inputMask;
@@ -280,32 +298,31 @@ var parseMask = function (inputMask, maskReplacers) {
     return inputMask;
 };
 
-/**
- * Notifies Vue about internal value change
- * @see https://github.com/vuejs/Discussion/issues/157#issuecomment-273301588
- */
-var trigger = function (el, type) {
-    var event = new CustomEvent(type, { bubbles: true, cancelable: true });
-    el.dispatchEvent(event);
+var __assign = function () {
+  __assign = Object.assign || function __assign(t) {
+    for (var s, i = 1, n = arguments.length; i < n; i++) {
+      s = arguments[i];
+      for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+    }
+    return t;
+  };
+  return __assign.apply(this, arguments);
 };
-/**
- * Extracts first input element inside given html element (if any)
- */
-var queryInputElementInside = function (el) {
-    return el instanceof HTMLInputElement ? el : el.querySelector('input') || el;
+
+var extendMaskReplacers = function (maskReplacers, baseMaskReplacers) {
+    if (baseMaskReplacers === void 0) { baseMaskReplacers = defaultMaskReplacers; }
+    if (maskReplacers === null || Array.isArray(maskReplacers) || typeof maskReplacers !== 'object') {
+        return baseMaskReplacers;
+    }
+    return Object.keys(maskReplacers).reduce(function (extendedMaskReplacers, key) {
+        var _a;
+        var value = maskReplacers[key];
+        if (value !== null && !(value instanceof RegExp)) {
+            return extendedMaskReplacers;
+        }
+        return __assign(__assign({}, extendedMaskReplacers), (_a = {}, _a[key] = value, _a));
+    }, baseMaskReplacers);
 };
-/**
- * Determines whether the passed value is a function
- */
-var isFunction = function (val) { return typeof val === 'function'; };
-/**
- * Determines whether the passed value is a string
- */
-var isString = function (val) { return typeof val === 'string'; };
-/**
- * Determines whether the passed value is a string
- */
-var isRegexp = function (val) { return val instanceof RegExp; };
 
 function createOptions() {
     var elementOptions = new Map();
@@ -327,15 +344,14 @@ var options = createOptions();
 var triggerInputUpdate = function (el) {
     trigger(el, 'input');
 };
-var updateValue = function (el, force) {
-    if (force === void 0) { force = false; }
+var updateValue = function (el) {
     // @ts-expect-error Property `value` does not exist on type `HTMLElement`
     var value = el.value;
     var _a = options.get(el), previousValue = _a.previousValue, mask = _a.mask;
     var isValueChanged = value !== previousValue;
     var isLengthIncreased = value.length > Number(previousValue === null || previousValue === void 0 ? void 0 : previousValue.length);
     var isUpdateNeeded = value && isValueChanged && isLengthIncreased;
-    if ((force || isUpdateNeeded) && mask) {
+    if (isUpdateNeeded && mask) {
         var conformedValue = conformToMask(value, mask, { guide: false }).conformedValue;
         // @ts-expect-error Property `value` does not exist on type `HTMLElement`
         el.value = conformedValue;
@@ -344,14 +360,9 @@ var updateValue = function (el, force) {
     options.partiallyUpdate(el, { previousValue: value });
 };
 var updateMask = function (el, inputMask, maskReplacers) {
-    var mask = parseMask(inputMask, maskReplacers);
+    var mask = parseMask(inputMask, maskReplacers, el.value);
     // @ts-expect-error Type `unknown` is not assignable to type `(string | RegExp)[] | undefined`
     options.partiallyUpdate(el, { mask: mask });
-};
-var maskToString = function (mask) {
-    var maskArray = Array.isArray(mask) ? mask : [mask];
-    var filteredMaskArray = maskArray.filter(function (part) { return isString(part) || isRegexp(part); });
-    return filteredMaskArray.toString();
 };
 var createDirective = function (directiveOptions) {
     if (directiveOptions === void 0) { directiveOptions = {}; }
@@ -364,11 +375,8 @@ var createDirective = function (directiveOptions) {
         },
         updated: function (el, binding) {
             el = queryInputElementInside(el);
-            var isMaskChanged = isFunction(binding.value) || maskToString(binding.oldValue) !== maskToString(binding.value);
-            if (isMaskChanged) {
-                updateMask(el, binding.value, instanceMaskReplacers);
-            }
-            updateValue(el, isMaskChanged);
+            updateMask(el, binding.value, instanceMaskReplacers);
+            updateValue(el);
         },
         unmounted: function (el) {
             el = queryInputElementInside(el);

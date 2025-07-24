@@ -18,7 +18,7 @@ export function createFilter(filterOptions = {}) {
    */
   return (value, inputMask) => {
     if (!isString(value) && !Number.isFinite(value)) return value
-    const mask = parseMask(inputMask, instanceMaskReplacers)
+    const mask = parseMask(inputMask, instanceMaskReplacers, value)
     const { conformedValue } = conformToMask(`${value}`, mask, { guide: false })
     return conformedValue
   }

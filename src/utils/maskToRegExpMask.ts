@@ -1,5 +1,5 @@
 import type { MaskReplacers } from '../types'
-import { defaultMaskReplacers, NEXT_CHAR_OPTIONAL } from '../constants'
+import { defaultMaskReplacers, defaultMaskReplacersGlobal, NEXT_CHAR_OPTIONAL } from '../constants'
 import { castToRegexp, makeRegexpOptional } from './regexp'
 
 const maskToRegExpMask = (mask: Array<string | RegExp> | null, maskReplacers: MaskReplacers = defaultMaskReplacers) => {
@@ -32,25 +32,44 @@ export const stringMaskToRegExpMask = (stringMask: string, maskReplacers: MaskRe
 }
 
 /**
- * Converts mask from `v-mask` array format to `text-mask-core` format
+ * Converts mask from `v-mask` array format to string format
  */
-export const arrayMaskToRegExpMask = (
+let dynamicMask = ''
+
+export const arrayMaskDynamicTransformToString = (
   arrayMask: Array<string | RegExp>,
-  maskReplacers: MaskReplacers = defaultMaskReplacers
+  maskReplacers: MaskReplacers = defaultMaskReplacers,
+  inputValue: string
 ) => {
-  const flattenedMask = arrayMask
-    .map((part) => {
-      if (part instanceof RegExp) {
-        return part
+  const modifyValueToMask = inputValue
+    .replace(defaultMaskReplacersGlobal['#'] as RegExp, '#')
+    .replace(defaultMaskReplacersGlobal['A'] as RegExp, 'A')
+    .replace(defaultMaskReplacersGlobal['s'] as RegExp, '')
+    .split('')
+
+  if (modifyValueToMask.length) {
+    arrayMask.some(function (currentMask) {
+      const modifyCurrentMask = String(currentMask).replace(defaultMaskReplacersGlobal['s'] as RegExp, '')
+
+      const matchMaskFound = modifyValueToMask.every(function (val, index) {
+        if (modifyCurrentMask[index] === val) {
+          return true
+        } else if ((val === '#' || val === 'A') && modifyCurrentMask[index] === 'N') {
+          return true
+        }
+        return false
+      })
+
+      if (matchMaskFound) {
+        dynamicMask = currentMask as string
+        return true
       }
 
-      if (typeof part === 'string') {
-        return part.split('')
-      }
-      return null
+      return false
     })
-    .filter(Boolean)
-    .reduce((mask: Array<string | RegExp>, part) => mask.concat(part as Array<string | RegExp>), [])
+  } else {
+    dynamicMask = arrayMask[0] as string
+  }
 
-  return maskToRegExpMask(flattenedMask, maskReplacers)
+  return stringMaskToRegExpMask(dynamicMask, maskReplacers)
 }
